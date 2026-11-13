@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends          # Depends = how FastAPI hands us the db session
+from fastapi import FastAPI, Depends, HTTPException          # Depends = how FastAPI hands us the db session
 from sqlalchemy.orm import Session             # the type of thing get_db yields — just for clarity
 
 from .database import Base, engine, get_db     # grab get_db now too
@@ -24,3 +24,17 @@ def create_class(payload: schemas.ClassCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_class)
     return new_class
+
+# list every course the user has added
+@app.get("/classes", response_model=list[schemas.ClassOut])
+def list_classes(db: Session = Depends(get_db)):          # borrow a clean db session like before
+    return db.query(models.Class).all()                   # grab every row in the classes table, hand them all back
+
+
+# fetch one course by its id
+@app.get("/classes/{class_id}", response_model=schemas.ClassOut)
+def get_class(class_id: int, db: Session = Depends(get_db)):                     # class_id is pulled straight from the url
+    found = db.query(models.Class).filter(models.Class.id == class_id).first()  # look for the row whose id matches
+    if found is None:                                                           # nothing in the table had that id
+        raise HTTPException(status_code=404, detail="Class not found")          # tell the client it doesn't exist
+    return found                                                                # otherwise hand back that one course
